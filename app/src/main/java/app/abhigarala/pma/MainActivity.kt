@@ -8,8 +8,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.abhigarala.pma.data.PasswordEntry
+import app.abhigarala.pma.ui.screen.PasswordManagerScreen
 import app.abhigarala.pma.ui.theme.PMATheme
 
 class MainActivity : ComponentActivity() {
@@ -22,25 +25,29 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Greeting("Android")
+                    val sampleData = remember {
+                        listOf(
+                            PasswordEntry("Google", "hunter2"),
+                            PasswordEntry("LinkedIn", "pa55w0rd"),
+                            PasswordEntry("Twitter", "qwerty123"),
+                            PasswordEntry("Facebook", "letmein"),
+                            PasswordEntry("Instagram", "abcdefg"),
+                            PasswordEntry("Google", "hunter2"),
+                            PasswordEntry("LinkedIn", "pa55w0rd"),
+                            PasswordEntry("Twitter", "qwerty123"),
+                            PasswordEntry("Facebook", "letmein"),
+                            PasswordEntry("Instagram", "abcdefg"),
+                            PasswordEntry("Google", "hunter2"),
+                            PasswordEntry("LinkedIn", "pa55w0rd"),
+                            PasswordEntry("Twitter", "qwerty123"),
+                            PasswordEntry("Facebook", "letmein"),
+                            PasswordEntry("Instagram", "abcdefg")
+                        )
+                    }
+
+                    PasswordManagerScreen(entries = sampleData, onItemClick = {}, onAddClick = {})
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    PMATheme {
-        Greeting("Android")
     }
 }
