@@ -25,9 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import app.abhigarala.pma.PMApp.Companion.RSA_PRIVATE_KEY
-import app.abhigarala.pma.cypher.EncryptionUtils
+import app.abhigarala.pma.R
 import app.abhigarala.pma.data.PasswordEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,69 +36,164 @@ fun AccountDetailSheet(
     entry: PasswordEntry,
     onDismiss: () -> Unit,
     onEdit: (PasswordEntry) -> Unit,
-    onDelete: (PasswordEntry) -> Unit
+    onDelete: (PasswordEntry) -> Unit,
+    decryptPassword: (String) -> String
 ) {
-    var visible by remember { mutableStateOf(false) }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        shape = MaterialTheme.shapes.large
     ) {
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            Text("Account Details", style = MaterialTheme.typography.titleLarge)
-
-            Text("Account", style = MaterialTheme.typography.labelSmall)
-            Text(entry.title, style = MaterialTheme.typography.bodyLarge)
-            Text("Username", style = MaterialTheme.typography.labelSmall)
-            Text(entry.username, style = MaterialTheme.typography.bodyLarge)
-
-            Text("Password", style = MaterialTheme.typography.labelSmall)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (visible) {
-                        EncryptionUtils.decrypt(
-                            entry.password,
-                            RSA_PRIVATE_KEY
-                        )
-                    } else {
-                        val passLength = EncryptionUtils.decrypt(
-                            entry.password,
-                            RSA_PRIVATE_KEY
-                        ).length
-                        "*".repeat(passLength)
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = { visible = !visible }) {
-                    Icon(
-                        imageVector = if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (visible) "Hide" else "Show"
-                    )
-                }
-            }
-
-            // Actions
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = { onEdit(entry) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp)
-                ) { Text("Edit") }
-
-                Button(
-                    onClick = { onDelete(entry) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                    shape = RoundedCornerShape(24.dp)
-                ) { Text("Delete") }
-            }
+            SheetHeader()
+            AccountDetailsContent(entry, decryptPassword)
+            ActionButtons(
+                entry = entry,
+                onEdit = onEdit,
+                onDelete = onDelete
+            )
         }
+    }
+}
+
+@Composable
+private fun SheetHeader() {
+    Text(
+        text = stringResource(R.string.account_details), // Use string resources
+        style = MaterialTheme.typography.titleLarge
+    )
+}
+
+@Composable
+private fun AccountDetailsContent(
+    entry: PasswordEntry,
+    decryptPassword: (String) -> String
+) {
+    val decryptedPassword = remember(entry.password) { decryptPassword(entry.password) }
+
+    DetailItem(
+        label = stringResource(R.string.account),
+        value = entry.title
+    )
+
+    DetailItem(
+        label = stringResource(R.string.username),
+        value = entry.username
+    )
+
+    PasswordDetailItem(
+        label = stringResource(R.string.password),
+        encryptedValue = entry.password,
+        decryptedValue = decryptedPassword
+    )
+}
+
+@Composable
+private fun DetailItem(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+private fun PasswordDetailItem(
+    label: String,
+    encryptedValue: String,
+    decryptedValue: String
+) {
+    var visible by remember { mutableStateOf(false) }
+
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall
+        )
+        PasswordVisibilityRow(
+            visible = visible,
+            decryptedPassword = decryptedValue,
+            onVisibilityToggle = { visible = !visible }
+        )
+    }
+}
+
+@Composable
+private fun PasswordVisibilityRow(
+    visible: Boolean,
+    decryptedPassword: String,
+    onVisibilityToggle: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = if (visible) decryptedPassword else "*".repeat(decryptedPassword.length),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onVisibilityToggle) {
+            Icon(
+                imageVector = if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                contentDescription = stringResource(
+                    if (visible) R.string.hide_password else R.string.show_password
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionButtons(
+    entry: PasswordEntry,
+    onEdit: (PasswordEntry) -> Unit,
+    onDelete: (PasswordEntry) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    )
+    {
+        ActionButton(
+            text = stringResource(R.string.edit),
+            onClick = { onEdit(entry) },
+            modifier = Modifier.weight(1f,true),
+            containerColor = MaterialTheme.colorScheme.primary
+        )
+
+        ActionButton(
+            text = stringResource(R.string.delete),
+            onClick = { onDelete(entry) },
+            Modifier.weight(1f,true),
+            containerColor = MaterialTheme.colorScheme.error
+        )
+    }
+}
+
+@Composable
+private fun ActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.primary
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = containerColor)
+    ) {
+        Text(text)
     }
 }

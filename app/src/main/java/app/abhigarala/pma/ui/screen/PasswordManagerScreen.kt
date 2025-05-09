@@ -3,7 +3,6 @@ package app.abhigarala.pma.ui.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -22,17 +21,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import app.abhigarala.pma.PMApp.Companion.RSA_PRIVATE_KEY
-import app.abhigarala.pma.cypher.EncryptionUtils
 import app.abhigarala.pma.data.PasswordEntry
 import app.abhigarala.pma.ui.bottomsheet.AccountDetailSheet
+import app.abhigarala.pma.ui.bottomsheet.AccountInputState
 import app.abhigarala.pma.ui.bottomsheet.AddAccountSheet
+import app.abhigarala.pma.ui.bottomsheet.InputField
 import app.abhigarala.pma.ui.itemlayout.PasswordCard
 import app.abhigarala.pma.utils.isValidPassword
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,220 +36,315 @@ fun PasswordManagerScreen(
     entries: List<PasswordEntry>,
     onAddEntry: (PasswordEntry) -> Unit,
     onUpdateEntry: (PasswordEntry) -> Unit,
-    onDeleteEntry: (PasswordEntry) -> Unit
+    onDeleteEntry: (PasswordEntry) -> Unit,
+    decryptPassword: (String) -> String
 ) {
+    var state by remember { mutableStateOf(PasswordManagerState()) }
 
-    var showAddSheet by remember { mutableStateOf(false) }
-    var addTitle by remember { mutableStateOf("") }
-    var addUsername by remember { mutableStateOf("") }
-    var addPassword by remember { mutableStateOf("") }
+    ScaffoldManager(
+        entries = entries,
+        state = state,
+        onStateChange = { state = it },
+        onAddEntry = onAddEntry,
+        onUpdateEntry = onUpdateEntry,
+        onDeleteEntry = onDeleteEntry,
+        decryptPassword = decryptPassword
+    )
+}
 
-    var showDetailSheet by remember { mutableStateOf(false) }
-    var selectedEntry by remember { mutableStateOf<PasswordEntry?>(null) }
-
-    var showEditSheet by remember { mutableStateOf(false) }
-    var editTitle by remember { mutableStateOf("") }
-    var editUsername by remember { mutableStateOf("") }
-    var editPassword by remember { mutableStateOf("") }
-
-    var showDialog by remember { mutableStateOf(false) }
-    var dialogTitle by remember { mutableStateOf("") }
-    var dialogMessage by remember { mutableStateOf("") }
-
+@Composable
+private fun ScaffoldManager(
+    entries: List<PasswordEntry>,
+    state: PasswordManagerState,
+    onStateChange: (PasswordManagerState) -> Unit,
+    onAddEntry: (PasswordEntry) -> Unit,
+    onUpdateEntry: (PasswordEntry) -> Unit,
+    onDeleteEntry: (PasswordEntry) -> Unit,
+    decryptPassword: (String) -> String
+) {
     Box {
-        Scaffold(
-            topBar = {
-                TopAppBar(title = { Text("Password Manager") })
+        MainContent(
+            entries = entries,
+            onEntrySelected = { entry ->
+                onStateChange(state.copy(screenState = ScreenState.Detail(entry)))
             },
-            floatingActionButton = {
-                FloatingActionButton(onClick = {
-                    showAddSheet = true
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add")
-                }
+            onAddClick = {
+                onStateChange(
+                    state.copy(
+                        screenState = ScreenState.Add,
+                        inputState = AccountInputState()
+                    )
+                )
             }
-        ) { padding ->
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    top = padding.calculateTopPadding() + 16.dp,
-                    bottom = padding.calculateBottomPadding() + 16.dp,
-                    start = 16.dp,
-                    end = 16.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(entries) { entry ->
-                    PasswordCard(entry = entry) {
-                        selectedEntry = entry
-                        showDetailSheet = true
-                    }
-                }
-            }
-        }
+        )
 
-        if (showAddSheet) {
-            AddAccountSheet(
-                onShowAddSheet = { visible ->
-                    showAddSheet = visible
-                    if (!visible) {
-                        addTitle = ""
-                        addUsername = ""
-                        addPassword = ""
-                    }
+        when (val screenState = state.screenState) {
+            is ScreenState.Add -> AddAccountSheet(
+                state = state.inputState,
+                onDismiss = { onStateChange(state.copy(screenState = ScreenState.None)) },
+                onInputChange = { field, value ->
+                    onStateChange(
+                        state.copy(
+                            inputState = updateInputState(
+                                field,
+                                value,
+                                state.inputState
+                            )
+                        )
+                    )
                 },
-                newTitle = addTitle,
-                onTitleChange = { addTitle = it },
-                newUsername = addUsername,
-                onUsernameChange = { addUsername = it },
-                newPassword = addPassword,
-                onPasswordChange = { addPassword = it },
-                onAdd = { entry ->
-                    when {
-                        entry.title.isBlank() -> {
-                            dialogTitle = "Missing Account"
-                            dialogMessage = "Please enter an account."
-                            showDialog = true
-                        }
-
-                        entry.username.isBlank() -> {
-                            dialogTitle = "Missing Username"
-                            dialogMessage = "Please enter a username or email."
-                            showDialog = true
-                        }
-
-                        entry.password.isBlank() -> {
-                            dialogTitle = "Missing Password"
-                            dialogMessage = "Please enter a password."
-                            showDialog = true
-                        }
-
-                        !entry.password.isValidPassword() -> {
-                            dialogTitle = "Invalid Password"
-                            dialogMessage =
-                                "Please enter a valid password. \n\n" + "/**\n" + "  * following password policy:\n" + "  • at least one digit \n" + "  • at least one lowercase alphabet \n" + "  • at least one uppercase alphabet \n" + "  • at least one special character \n" + "  • minimum length of 8 characters\n" + " */"
-                            showDialog = true
-                        }
-
-                        else -> {
-                            onAddEntry(entry)
-                            addTitle = ""
-                            addUsername = ""
-                            addPassword = ""
-                            dialogTitle = "Success"
-                            dialogMessage = "Account added."
-                            showDialog = true
-                            showAddSheet = false
-                        }
-                    }
-                }
+                onSubmit = { handleSubmit(it, state, onAddEntry, onUpdateEntry, onStateChange) }
             )
-        }
 
+            is ScreenState.Edit -> AddAccountSheet(
+                state = state.inputState,
+                onDismiss = { onStateChange(state.copy(screenState = ScreenState.None)) },
+                onInputChange = { field, value ->
+                    onStateChange(
+                        state.copy(
+                            inputState = updateInputState(
+                                field,
+                                value,
+                                state.inputState
+                            )
+                        )
+                    )
+                },
+                onSubmit = { handleSubmit(it, state, onAddEntry, onUpdateEntry, onStateChange) }
+            )
 
-        if (showDetailSheet && selectedEntry != null) {
-            AccountDetailSheet(
-                entry = selectedEntry!!,
-                onDismiss = { showDetailSheet = false },
+            is ScreenState.Detail -> AccountDetailSheet(
+                entry = screenState.entry,
+                onDismiss = { onStateChange(state.copy(screenState = ScreenState.None)) },
                 onEdit = { entry ->
-                    editTitle = entry.title
-                    editUsername = entry.username
-                    editPassword = EncryptionUtils.decrypt(entry.password, RSA_PRIVATE_KEY)
-                    showDetailSheet = false
-                    showEditSheet = true
+                    onStateChange(
+                        state.copy(
+                            screenState = ScreenState.Edit(entry),
+                            inputState = AccountInputState(
+                                title = entry.title,
+                                username = entry.username,
+                                password = decryptPassword(entry.password),
+                                isEditMode = true
+                            )
+                        )
+                    )
                 },
                 onDelete = { entry ->
-                    showDetailSheet = false
-                    dialogTitle = "Delete Account"
-                    dialogMessage = "Are you sure you want to delete “${entry.title}”?"
-                    showDialog = true
-                }
+                    onStateChange(
+                        state.copy(
+                            dialogState = DialogState.ConfirmDelete(entry),
+                            screenState = ScreenState.Detail(entry)
+                        )
+                    )
+                },
+                decryptPassword = decryptPassword
             )
+
+            ScreenState.None -> Unit
         }
 
-        if (showEditSheet && selectedEntry != null) {
-            AddAccountSheet(
-                isFromEdit = true,
-                onShowAddSheet = { visible ->
-                    showEditSheet = visible
-                    if (!visible) {
-                        editTitle = ""
-                        editUsername = ""
-                        editPassword = ""
-                    }
-                },
-                newTitle = editTitle,
-                onTitleChange = { editTitle = it },
-                newUsername = editUsername,
-                onUsernameChange = { editUsername = it },
-                newPassword = editPassword,
-                onPasswordChange = { editPassword = it },
-                onAdd = { entry ->
-                    when {
-                        entry.title.isBlank() -> {
-                            dialogTitle = "Missing Account"
-                            dialogMessage = "Please enter an account."
-                            showDialog = true
-                        }
+        DialogManager(
+            state = state.dialogState,
+            onDismiss = { onStateChange(state.copy(dialogState = DialogState.Hidden)) },
+            onConfirmDelete = { entry ->
+                onDeleteEntry(entry)
+                onStateChange(state.copy(dialogState = DialogState.Hidden))
+            },
+            onStateChange = onStateChange
+        )
+    }
+}
 
-                        entry.username.isBlank() -> {
-                            dialogTitle = "Missing Username"
-                            dialogMessage = "Please enter a username or email."
-                            showDialog = true
-                        }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainContent(
+    entries: List<PasswordEntry>,
+    onEntrySelected: (PasswordEntry) -> Unit,
+    onAddClick: () -> Unit
+) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Password Manager") }) },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddClick) {
+                Icon(Icons.Default.Add, contentDescription = "Add")
+            }
+        }
+    ) { padding ->
+        PasswordEntryList(
+            entries = entries,
+            onEntrySelected = onEntrySelected,
+            padding = padding
+        )
+    }
+}
 
-                        entry.password.isBlank() -> {
-                            dialogTitle = "Missing Password"
-                            dialogMessage = "Please enter a password."
-                            showDialog = true
-                        }
+@Composable
+private fun PasswordEntryList(
+    entries: List<PasswordEntry>,
+    onEntrySelected: (PasswordEntry) -> Unit,
+    padding: PaddingValues
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(
+            top = padding.calculateTopPadding() + 16.dp,
+            bottom = padding.calculateBottomPadding() + 16.dp,
+            start = 16.dp,
+            end = 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(entries) { entry ->
+            PasswordCard(entry = entry) { onEntrySelected(entry) }
+        }
+    }
+}
 
-                        !entry.password.isValidPassword() -> {
-                            dialogTitle = "Invalid Password"
-                            dialogMessage =
-                                "Please enter a valid password. \n\n" + "/**\n" + "  * following password policy:\n" + "  • at least one digit \n" + "  • at least one lowercase alphabet \n" + "  • at least one uppercase alphabet \n" + "  • at least one special character \n" + "  • minimum length of 8 characters\n" + " */"
-                            showDialog = true
-                        }
-
-                        else -> {
-                            val updatedEntry = entry.copy(id = selectedEntry!!.id)
-                            onUpdateEntry(updatedEntry)
-                            dialogTitle = "Updated"
-                            dialogMessage = "Account updated successfully."
-                            showDialog = true
-                            showEditSheet = false
-                        }
-                    }
+@Composable
+private fun DialogManager(
+    state: DialogState,
+    onDismiss: () -> Unit,
+    onConfirmDelete: (PasswordEntry) -> Unit,
+    onStateChange: (PasswordManagerState) -> Unit
+) {
+    when (state) {
+        is DialogState.Alert -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(state.title) },
+            text = { Text(state.message) },
+            confirmButton = {
+                Button(onClick = onDismiss) {
+                    Text("OK")
                 }
-            )
+            }
+        )
+
+        is DialogState.ConfirmDelete -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Delete Account") },
+            text = { Text("Are you sure you want to delete “${state.entry.title}”?") },
+            confirmButton = {
+                Button(onClick = {
+                    onConfirmDelete(state.entry)
+                    onStateChange(
+                        PasswordManagerState(
+                            screenState = ScreenState.None,
+                            dialogState = DialogState.Hidden
+                        )
+                    )
+                }) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
+
+        DialogState.Hidden -> Unit
+    }
+}
+
+private fun updateInputState(
+    field: InputField,
+    value: String,
+    currentState: AccountInputState
+): AccountInputState {
+    return when (field) {
+        InputField.TITLE -> currentState.copy(title = value)
+        InputField.USERNAME -> currentState.copy(username = value)
+        InputField.PASSWORD -> currentState.copy(password = value)
+    }
+}
+
+private fun handleSubmit(
+    entry: PasswordEntry,
+    state: PasswordManagerState,
+    onAddEntry: (PasswordEntry) -> Unit,
+    onUpdateEntry: (PasswordEntry) -> Unit,
+    onStateChange: (PasswordManagerState) -> Unit
+) {
+    when (val validation = validateEntry(entry)) {
+        is ValidationResult.Valid -> {
+            if (state.inputState.isEditMode) {
+                onUpdateEntry(entry.copy(id = (state.screenState as ScreenState.Edit).entry.id))
+                onStateChange(
+                    state.copy(
+                        screenState = ScreenState.None,
+                        dialogState = DialogState.Alert("Updated", "Account updated successfully.")
+                    )
+                )
+            } else {
+                onAddEntry(entry)
+                onStateChange(
+                    state.copy(
+                        screenState = ScreenState.None,
+                        dialogState = DialogState.Alert("Success", "Account added.")
+                    )
+                )
+            }
         }
 
-        if (showDialog) {
-            AlertDialog(
-                onDismissRequest = { showDialog = false },
-                title = { Text(dialogTitle) },
-                text = { Text(dialogMessage) },
-                confirmButton = {
-                    Button(onClick = {
-                        showDialog = false
-                        if (dialogTitle == "Delete Account") {
-                            selectedEntry?.let { onDeleteEntry(it) }
-                        }
-                    }) {
-                        Text("OK")
-                    }
-                },
-                dismissButton = {
-                    if (dialogTitle.startsWith("Delete")) {
-                        OutlinedButton(onClick = { showDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .padding(16.dp)
-                    .zIndex(100f)
+        is ValidationResult.Invalid -> {
+            onStateChange(
+                state.copy(
+                    dialogState = DialogState.Alert(validation.title, validation.message)
+                )
             )
         }
     }
 }
+
+sealed class ValidationResult {
+    data class Valid(val entry: PasswordEntry) : ValidationResult()
+    data class Invalid(val title: String, val message: String) : ValidationResult()
+}
+
+private fun validateEntry(entry: PasswordEntry): ValidationResult {
+    return when {
+        entry.title.isBlank() -> ValidationResult.Invalid(
+            "Missing Account",
+            "Please enter an account."
+        )
+
+        entry.username.isBlank() -> ValidationResult.Invalid(
+            "Missing Username",
+            "Please enter a username or email."
+        )
+
+        entry.password.isBlank() -> ValidationResult.Invalid(
+            "Missing Password",
+            "Please enter a password."
+        )
+
+        !entry.password.isValidPassword() -> ValidationResult.Invalid(
+            "Invalid Password",
+            "Password must contain:\n" +
+                    "• 1 digit\n• 1 lowercase\n• 1 uppercase\n" +
+                    "• 1 special character\n• Minimum 12 characters"
+        )
+
+        else -> ValidationResult.Valid(entry)
+    }
+}
+
+sealed class ScreenState {
+    object None : ScreenState()
+    object Add : ScreenState()
+    data class Edit(val entry: PasswordEntry) : ScreenState()
+    data class Detail(val entry: PasswordEntry) : ScreenState()
+}
+
+sealed class DialogState {
+    object Hidden : DialogState()
+    data class Alert(val title: String, val message: String) : DialogState()
+    data class ConfirmDelete(val entry: PasswordEntry) : DialogState()
+}
+
+data class PasswordManagerState(
+    val screenState: ScreenState = ScreenState.None,
+    val dialogState: DialogState = DialogState.Hidden,
+    val inputState: AccountInputState = AccountInputState()
+)
 

@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import app.abhigarala.pma.PMApp.Companion.RSA_PRIVATE_KEY
 import app.abhigarala.pma.cypher.EncryptionUtils
 import app.abhigarala.pma.data.PasswordEntry
 import app.abhigarala.pma.ui.screen.PasswordManagerScreen
@@ -30,7 +31,6 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val entries by viewModel.entries.collectAsState()
-
                     PasswordManagerScreen(
                         entries = entries,
                         onAddEntry = { entry ->
@@ -69,6 +69,9 @@ class MainActivity : ComponentActivity() {
                                     password = entry.password
                                 )
                             )
+                        },
+                        decryptPassword = {
+                            EncryptionUtils.decrypt(it, RSA_PRIVATE_KEY)
                         }
                     )
                 }
