@@ -72,6 +72,7 @@ dependencies {
 
     // Material 3
     implementation("androidx.compose.material3:material3:1.3.2")
+    implementation ("androidx.compose.material:material-icons-extended:1.3.2")
 
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")

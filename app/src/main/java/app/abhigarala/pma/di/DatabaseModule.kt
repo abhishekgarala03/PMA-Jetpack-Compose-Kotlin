@@ -17,12 +17,11 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(
-        @ApplicationContext app: Context
-    ): AppDatabase = Room.databaseBuilder(
-        app,
-        AppDatabase::class.java,
-        "app_db"
-    ).build()
+        @ApplicationContext ctx: Context
+    ): AppDatabase =
+        Room.databaseBuilder(ctx, AppDatabase::class.java, "app_db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
     fun providePasswordDao(db: AppDatabase): PasswordDao =
